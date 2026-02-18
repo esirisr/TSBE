@@ -8,41 +8,22 @@ import authRoutes from './routes/authRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js'; 
 import userRoutes from './routes/userRoutes.js'; 
-import proRoutes from './routes/proRoutes.js';
+import proRoutes from './routes/proRoutes.js'; // 1. ADD THIS IMPORT
 
 dotenv.config();
-
-// Connect to Database
-connectDB();
-
 const app = express();
 
-// 1. IMPROVED CORS: Use the specific origin from your first script
-const allowedOrigin = process.env.CLIENT_URL || 'https://myfe.up.railway.app';
-
-app.use(cors({
-  origin: allowedOrigin,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true
-}));
-
+app.use(cors()); 
 app.use(express.json());
 
-// 2. ROOT ROUTE: Added for health checks (Railway likes this)
-app.get('/', (req, res) => {
-  res.status(200).json({ message: 'API is live and kicking' });
-});
+connectDB();
 
 // Mounting Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes); 
-app.use('/api/pros', proRoutes);
+app.use('/api/pros', proRoutes); // 2. ADD THIS MOUNTING LINE
 
 const PORT = process.env.PORT || 5000;
-
-// 3. UPDATED LISTEN: Added '0.0.0.0' for deployment compatibility
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
