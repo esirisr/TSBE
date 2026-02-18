@@ -17,23 +17,34 @@ connectDB();
 
 const app = express();
 
-// 1. IMPROVED CORS: Use the specific origin from your first script
-const allowedOrigin = process.env.CLIENT_URL || 'https://myfe.up.railway.app';
+// UPDATED CORS: This allows BOTH your local dev and your deployed site
+const allowedOrigins = [
+  'http://localhost:3000', // Default React port
+  'http://localhost:5173', // Default Vite port
+  'https://myfe.up.railway.app' // Your deployed frontend
+];
 
 app.use(cors({
-  origin: allowedOrigin,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      return callback(new Error('CORS policy: This origin is not allowed'), false);
+    }
+    return callback(null, true);
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
 
 app.use(express.json());
 
-// 2. ROOT ROUTE: Added for health checks (Railway likes this)
+// Root route for health check
 app.get('/', (req, res) => {
   res.status(200).json({ message: 'API is live and kicking' });
 });
 
-// Mounting Routes
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/bookings', bookingRoutes);
@@ -42,7 +53,7 @@ app.use('/api/pros', proRoutes);
 
 const PORT = process.env.PORT || 5000;
 
-// 3. UPDATED LISTEN: Added '0.0.0.0' for deployment compatibility
+// Listen on 0.0.0.0 for Railway/Deployment compatibility
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
