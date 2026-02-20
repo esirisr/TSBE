@@ -6,37 +6,28 @@ import User from '../models/User.js';
  */
 export const getAdminDashboardData = async (req, res) => {
   try {
+    const role = req.user.role;
     const userId = req.user.id;
 
-    // 1. Fetch the requester's data
+    // 1. Fetch the requester's data to identify their location
     const currentUser = await User.findById(userId);
     if (!currentUser) {
-      return res.status(404).json({ success: false, message: "User not found" });
+        return res.status(404).json({ success: false, message: "User not found" });
     }
-
-    // --- MASTER ADMIN OVERRIDE ---
-    // If this is your email, force the role to 'admin' regardless of DB settings
-    const MASTER_EMAIL = 'himilo@gmail.com';
-    let userRole = currentUser.role;
     
-    if (currentUser.email === MASTER_EMAIL) {
-      userRole = 'admin';
-    }
-
-    // Normalize user location for filtering
+    // Normalize user location: trim spaces and lowercase for perfect matching
     const userLocation = currentUser.location ? currentUser.location.trim().toLowerCase() : '';
 
-    // 2. Fetch all professionals (Exclude the master admin from being listed as a Pro)
+    // 2. Fetch all professionals, excluding the master admin
     const allPros = await User.find({ 
       role: 'pro', 
-      email: { $ne: MASTER_EMAIL } 
+      email: { $ne: 'himiloone@gmail.com' } 
     }).select('-password').sort({ createdAt: -1 });
 
-    // --- ADMIN VIEW ---
-    if (userRole === 'admin') {
+    // --- ADMIN VIEW: Sees everything to manage them ---
+    if (role === 'admin') {
       return res.json({
         success: true,
-        isAdmin: true, // Helper flag for frontend
         stats: {
           totalPros: allPros.length,
           pendingApprovals: allPros.filter(p => !p.isVerified).length,
@@ -47,22 +38,21 @@ export const getAdminDashboardData = async (req, res) => {
       });
     }
 
-    // --- CLIENT VIEW ---
+    // --- CLIENT VIEW: Matching Logic ---
+    // Filters based on Verification, Suspension, and City Normalization
     const matchedPros = allPros.filter(p => {
+      // Handle both Boolean and String types for database flexibility
       const isVerified = p.isVerified === true || String(p.isVerified) === 'true';
       const isSuspended = p.isSuspended === true || String(p.isSuspended) === 'true';
+      
+      // Normalize Pro Location for comparison
       const proLocation = p.location ? p.location.trim().toLowerCase() : '';
       
-      // Clients only see verified, active pros in their specific city
+      // The core logic: City must match exactly after normalization
       return isVerified && !isSuspended && proLocation === userLocation;
     });
 
-    res.json({ 
-      success: true, 
-      isAdmin: false,
-      allPros: matchedPros 
-    });
-
+    res.json({ success: true, allPros: matchedPros });
   } catch (error) {
     console.error("Dashboard Error:", error);
     res.status(500).json({ success: false, message: "Server Error" });
@@ -74,12 +64,11 @@ export const getAdminDashboardData = async (req, res) => {
  */
 export const verifyPro = async (req, res) => {
   try {
-    const user = await User.findByIdAndUpdate(
-      req.params.id, 
-      { isVerified: true }, 
-      { new: true }
-    );
+    const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    user.isVerified = true;
+    await user.save();
 
     res.json({ success: true, message: "Professional Approved!", user });
   } catch (error) {
